@@ -1,76 +1,87 @@
 package v4
 
 import (
+	"gosetgo/ds"
 	"sync"
-	"time"
 )
 
-type Set struct {
-	items map[int]bool
-	addCh chan int
-	delCh chan int
+var (
+	shardLocker = sync.Map{}
+	numShards   = 3
+)
 
-	readCopy map[int]bool
-
-	close chan struct{}
-	wg    sync.WaitGroup
+type set struct {
+	shards []map[interface{}]bool
 }
 
-func NewSet() *Set {
-	set := &Set{
-		items: make(map[int]bool),
-		addCh: make(chan int, 100),
-		delCh: make(chan int, 100),
-		close: make(chan struct{}), // Channel to signal closing
-	}
-	set.wg.Add(1)
-	go set.process(1000) // 1 second refresh interval
-	return set
-}
-
-func (s *Set) process(refreshIntervalMs int) {
-	ticker := time.NewTicker(time.Duration(refreshIntervalMs) * time.Millisecond)
-
-	defer s.wg.Done()
-	for {
-		select {
-		case <-ticker.C:
-			s.readCopy = make(map[int]bool)
-			for k, v := range s.items {
-				s.readCopy[k] = v
-			}
-		case key := <-s.addCh:
-			s.items[key] = true
-		case key := <-s.delCh:
-			delete(s.items, key)
-		case <-s.close:
-			return
-		}
+func NewSet() ds.Set {
+	return &set{
+		shards: make([]map[interface{}]bool, numShards),
 	}
 }
 
-func (s *Set) Add(key int) bool {
-	if s.Contains(key) {
+func (s *set) Add(item interface{}) bool {
+
+	lockKey := item.(int) % numShards
+
+	// get or set shard lock
+	if _, ok := shardLocker.Load(lockKey); !ok {
+		shardLocker.Store(lockKey, &sync.RWMutex{})
+		s.shards[lockKey] = make(map[interface{}]bool)
+	}
+	v, _ := shardLocker.Load(lockKey)
+	shardLock := v.(*sync.RWMutex)
+
+	shardLock.RLock()
+	if _, ok := s.shards[lockKey][item]; ok {
+		shardLock.RUnlock()
 		return false
 	}
-	s.addCh <- key
+	shardLock.RUnlock()
+
+	shardLock.Lock()
+	defer shardLock.Unlock()
+	s.shards[lockKey][item] = true
 	return true
 }
 
-func (s *Set) Delete(key int) bool {
-	if !s.Contains(key) {
+func (s *set) Remove(item interface{}) bool {
+	lockKey := item.(int) % numShards
+
+	// get or set shard lock
+	if _, ok := shardLocker.Load(lockKey); !ok {
+		shardLocker.Store(lockKey, &sync.RWMutex{})
+		s.shards[lockKey] = make(map[interface{}]bool)
+	}
+	v, _ := shardLocker.Load(lockKey)
+	shardLock := v.(*sync.RWMutex)
+
+	shardLock.RLock()
+	if _, ok := s.shards[lockKey][item]; !ok {
+		shardLock.RUnlock()
 		return false
 	}
-	s.delCh <- key
+	shardLock.RUnlock()
+
+	shardLock.Lock()
+	defer shardLock.Unlock()
+	delete(s.shards[lockKey], item)
 	return true
 }
 
-func (s *Set) Contains(key int) bool {
-	_, found := s.readCopy[key]
-	return found
-}
+func (s *set) Contains(item interface{}) bool {
+	lockKey := item.(int) % numShards
 
-func (s *Set) Close() {
-	close(s.close)
-	s.wg.Wait()
+	// get or set shard lock
+	if _, ok := shardLocker.Load(lockKey); !ok {
+		shardLocker.Store(lockKey, &sync.RWMutex{})
+		s.shards[lockKey] = make(map[interface{}]bool)
+	}
+	v, _ := shardLocker.Load(lockKey)
+	shardLock := v.(*sync.RWMutex)
+
+	shardLock.RLock()
+	defer shardLock.RUnlock()
+	_, ok := s.shards[lockKey][item]
+	return ok
 }

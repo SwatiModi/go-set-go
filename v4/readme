@@ -1,10 +1,3 @@
-What
-- Using a golang buffered channel, 
-  maintain two copies and we do an eventual sync of the two copies
-
-Cons
-- Staleness in data reads
-- In this approach, writes are blocked until the read copy is updated
-
-Alternatives
-- How to do a async update of the read copy without blocking writes? AtomicSwap HOw?
+Sharded locking
+Based on hash of value, we decide which shard lock should it pick.
+This is a way to distribute locks across multiple shards.
