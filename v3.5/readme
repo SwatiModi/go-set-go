@@ -1,0 +1,6 @@
+Optimistic locking
+
+One way of fine-grained locking is to search without aquiring any locks at all.
+If the method finds the sought-after component, it locks that component and then checks that component
+has not been modified since the search was performed. 
+This technique is worthwhile only if it succeeds more often than not, which is why we call it optimistic locking.

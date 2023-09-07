@@ -1,7 +1,7 @@
 package main
 
 import (
-	v4 "gosetgo/v4"
+	v35 "gosetgo/v3.5"
 	"log"
 	"sync"
 )
@@ -14,7 +14,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	// add 10 items to the set
-	s := v4.NewSet()
+	s := v35.NewSet()
 	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
