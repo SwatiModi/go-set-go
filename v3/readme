@@ -1,0 +1,6 @@
+- No thread can aquire the writeLock while any thread holds the writeLock or readLock.
+- No thread can aquire the readLock while any thread holds the writeLock.
+- Enables multiple threads to hold the readLock at the same time.
+
+Problems:
+If reads are much more frequent than writes, as is usually the case, then writers could be locked out for a long time by a continual stream of readers.
