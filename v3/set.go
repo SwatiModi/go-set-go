@@ -18,9 +18,13 @@ func NewSet() ds.Set {
 }
 
 func (s *set) Add(item interface{}) bool {
-	if s.Contains(item) {
+	s.mu.RLock()
+	if _, ok := s.items[item]; ok {
+		s.mu.RUnlock()
 		return false
 	}
+	s.mu.RUnlock()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.items[item] = true
@@ -28,9 +32,13 @@ func (s *set) Add(item interface{}) bool {
 }
 
 func (s *set) Remove(item interface{}) bool {
-	if !s.Contains(item) {
+	s.mu.RLock()
+	if _, ok := s.items[item]; !ok {
+		s.mu.RUnlock()
 		return false
 	}
+	s.mu.RUnlock()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, item)
