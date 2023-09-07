@@ -1,0 +1,1 @@
+using golang's syncMap, internally has a mutex but is apparently more efficient
