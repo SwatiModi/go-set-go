@@ -6,11 +6,12 @@ import (
 )
 
 type Set struct {
-	items map[int]bool
-	addCh chan int
-	delCh chan int
+	items map[interface{}]bool
+	addCh chan interface{}
+	delCh chan interface{}
 
-	readCopy map[int]bool
+	readCopy  map[interface{}]bool
+	refreshMU sync.RWMutex
 
 	close chan struct{}
 	wg    sync.WaitGroup
@@ -18,9 +19,9 @@ type Set struct {
 
 func NewSet() *Set {
 	set := &Set{
-		items: make(map[int]bool),
-		addCh: make(chan int, 100),
-		delCh: make(chan int, 100),
+		items: make(map[interface{}]bool),
+		addCh: make(chan interface{}, 100),
+		delCh: make(chan interface{}, 100),
 		close: make(chan struct{}), // Channel to signal closing
 	}
 	set.wg.Add(1)
@@ -35,10 +36,12 @@ func (s *Set) process(refreshIntervalMs int) {
 	for {
 		select {
 		case <-ticker.C:
-			s.readCopy = make(map[int]bool)
+			s.refreshMU.Lock()
+			s.readCopy = make(map[interface{}]bool)
 			for k, v := range s.items {
 				s.readCopy[k] = v
 			}
+			s.refreshMU.Unlock()
 		case key := <-s.addCh:
 			s.items[key] = true
 		case key := <-s.delCh:
@@ -49,7 +52,7 @@ func (s *Set) process(refreshIntervalMs int) {
 	}
 }
 
-func (s *Set) Add(key int) bool {
+func (s *Set) Add(key interface{}) bool {
 	if s.Contains(key) {
 		return false
 	}
@@ -57,7 +60,7 @@ func (s *Set) Add(key int) bool {
 	return true
 }
 
-func (s *Set) Delete(key int) bool {
+func (s *Set) Remove(key interface{}) bool {
 	if !s.Contains(key) {
 		return false
 	}
@@ -65,8 +68,10 @@ func (s *Set) Delete(key int) bool {
 	return true
 }
 
-func (s *Set) Contains(key int) bool {
+func (s *Set) Contains(key interface{}) bool {
+	s.refreshMU.RLock()
 	_, found := s.readCopy[key]
+	s.refreshMU.RUnlock()
 	return found
 }
 

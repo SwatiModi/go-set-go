@@ -15,8 +15,12 @@ type set struct {
 }
 
 func NewSet() ds.Set {
+	shards := make([]map[interface{}]bool, numShards)
+	for i := 0; i < numShards; i++ {
+		shards[i] = map[interface{}]bool{}
+	}
 	return &set{
-		shards: make([]map[interface{}]bool, numShards),
+		shards: shards,
 	}
 }
 
@@ -27,7 +31,6 @@ func (s *set) Add(item interface{}) bool {
 	// get or set shard lock
 	if _, ok := shardLocker.Load(lockKey); !ok {
 		shardLocker.Store(lockKey, &sync.RWMutex{})
-		s.shards[lockKey] = make(map[interface{}]bool)
 	}
 	v, _ := shardLocker.Load(lockKey)
 	shardLock := v.(*sync.RWMutex)
@@ -51,7 +54,6 @@ func (s *set) Remove(item interface{}) bool {
 	// get or set shard lock
 	if _, ok := shardLocker.Load(lockKey); !ok {
 		shardLocker.Store(lockKey, &sync.RWMutex{})
-		s.shards[lockKey] = make(map[interface{}]bool)
 	}
 	v, _ := shardLocker.Load(lockKey)
 	shardLock := v.(*sync.RWMutex)
@@ -75,7 +77,6 @@ func (s *set) Contains(item interface{}) bool {
 	// get or set shard lock
 	if _, ok := shardLocker.Load(lockKey); !ok {
 		shardLocker.Store(lockKey, &sync.RWMutex{})
-		s.shards[lockKey] = make(map[interface{}]bool)
 	}
 	v, _ := shardLocker.Load(lockKey)
 	shardLock := v.(*sync.RWMutex)
